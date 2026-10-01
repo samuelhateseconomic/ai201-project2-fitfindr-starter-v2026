@@ -64,21 +64,21 @@
 ### `search_listings`
 
 - **What it does:** This tool is intended to find listings related to a product description. It filters out listings that do not match the requested size or exceed the price limit, then ranks the remaining listings by keyword overlap with the description.
-- **Inputs:** It takes a required description (string) and optional size (string) and maximum price (float).
+- **Inputs:** It takes a `description` (string) and `size` (string) and `maximum price` (float).
 - **Returns:** A list of matching listing dictionaries, ranked by keyword overlap and limited to the configured result limit. Each dictionary contains listing details such as its title, description, size, price, colors, and platform.
 - **When it has nothing:** Returns an empty list (`[]`) if nothing matches.
 
 ### `suggest_outfit`
 
 - **What it does:** Suggests one or two ways to style the thrift listing with clothes the user already owns.
-- **Inputs:** `new_item` (`dict`), one listing the user is considering; `wardrobe` (`dict`), containing an `items` list of the user's clothing and accessories.
+- **Inputs:** `new_item` (dict), one listing the user is considering; `wardrobe` (dict), containing an `items` list of the user's clothing and accessories.
 - **Returns:** A non-empty string with outfit suggestions that use pieces from the wardrobe when available.
 - **When it has nothing:** If `wardrobe["items"]` is empty, returns general styling advice for `new_item` instead of an empty string.
 
 ### `create_fit_card`
 
 - **What it does:** Writes a short, post-ready caption about the thrift find and a suggested outfit.
-- **Inputs:** `outfit` (`str`), the suggestion from `suggest_outfit`; `new_item` (`dict`), one listing containing the item's details.
+- **Inputs:** `outfit` (str), the suggestion from `suggest_outfit`; `new_item` (dict), one listing containing the item's details.
 - **Returns:** A two-to-four-sentence caption that mentions the item, its price, and its platform, and describes its style.
 - **When it has nothing:** If `outfit` is empty or only whitespace, returns a descriptive fallback message.
 
@@ -97,13 +97,13 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If `search_listings` returns an empty list, put a message in `session["error"]` explaining what the user could change, then stop before calling `suggest_outfit`. Otherwise, save the first (highest-ranked) result as `session["selected_item"]`, pass it and the wardrobe to `suggest_outfit`, then pass the item and outfit suggestion to `create_fit_card`.
 
-**Where it lives:** `agent.py::run_agent`
+**Where it lives:** `agent.py::run_agent` 
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Plan to use regular expressions to extract an optional size and price limit; the remaining words become the product description.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** Store the original `query` and `wardrobe`, then the parsed description, size, and price in `session["parsed"]`. Store search results in `session["search_results"]`. If there is a match, pass the first result through `session["selected_item"]`, `session["outfit_suggestion"]`, and finally `session["fit_card"]`. If there are no matches, store an explanation in `session["error"]` and stop before the later fields are filled.
 
 ---
 
