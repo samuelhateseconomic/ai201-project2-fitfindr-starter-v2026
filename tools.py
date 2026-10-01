@@ -27,6 +27,40 @@ from utils.data_loader import load_listings
 
 # ── Tool 1: search_listings ───────────────────────────────────────────────────
 
+_STOPWORDS = {
+    "a", "about", "above", "after", "again", "against", "all", "am",
+    "an", "and", "any", "are","as", "at", "be", "because", "been",
+    "before", "being", "below", "between", "both", "but", "by", "can",
+    "could", "did", "do", "does", "doing", "down", "during", "each",
+    "few", "for", "from", "further", "had", "has", "have", "having",
+    "he", "her", "here", "hers", "him", "his", "how", "i", "if", "in",
+    "into", "is", "it", "its", "just", "me", "more", "most", "my",
+    "nor", "of", "on", "once", "only", "or", "other", "our", "ours",
+    "out", "over", "own", "same", "she", "should", "so", "some", "such",
+    "than", "that", "the", "their", "theirs", "them", "then", "there",
+    "these", "they", "this", "those", "through", "to", "too", "under",
+    "up", "very", "was", "we", "were", "what", "when", "where", "which",
+    "while", "who", "whom", "why", "will", "with", "would", "you", "your",
+}
+
+def _keywords(text: str) -> set[str]:
+    """Lowercase words worth matching on, stopwords removed."""
+    words = re.findall(r"[a-z0-9']+", (text or "").lower())
+    return { w for w in words if w not in _STOPWORDS and len(w) >1 }
+
+def _size_tokens(size: str) -> set[str]:
+    cleaned = re.sub(r"\([^)]*\)", " ", size or "") # drop parentheticals
+    parts = [p.strip().upper() for p in cleaned.split("/")]
+    return { p for p in parts if p }
+
+def _size_matches(wanted: str, listing_size:str) -> bool:
+    if not wanted:
+        return True
+    listing_tokens = _size_tokens(listing_size)
+    if any(token.startswith("ONE SIZE") for token in listing_tokens):
+        return True
+    return bool(_size_tokens(wanted) & listing_tokens)
+
 def search_listings(
     description: str,
     size: str | None = None,

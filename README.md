@@ -40,6 +40,10 @@
 ## What This Does
 
 <!-- Three or four sentences: what a user asks for, and what they get back. -->
+     python app.py listings --full -n 6   => prints six listings with their full details.
+     python app.py fields                 => shows what information listings and wardrobe items contain
+     python app.py ask  'vintage graphic tee under $30' 
+                                          => Not work yet but expect to send that sample request to the app and prints its response in the terminal. You can replace the quoted text with your own request.
 
 
 
@@ -59,24 +63,24 @@
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** This tool is intended to find listings related to a product description. It filters out listings that do not match the requested size or exceed the price limit, then ranks the remaining listings by keyword overlap with the description.
+- **Inputs:** It takes a required description (string) and optional size (string) and maximum price (float).
+- **Returns:** A list of matching listing dictionaries, ranked by keyword overlap and limited to the configured result limit. Each dictionary contains listing details such as its title, description, size, price, colors, and platform.
+- **When it has nothing:** Returns an empty list (`[]`) if nothing matches.
 
 ### `suggest_outfit`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Suggests one or two ways to style the thrift listing with clothes the user already owns.
+- **Inputs:** `new_item` (`dict`), one listing the user is considering; `wardrobe` (`dict`), containing an `items` list of the user's clothing and accessories.
+- **Returns:** A non-empty string with outfit suggestions that use pieces from the wardrobe when available.
+- **When it has nothing:** If `wardrobe["items"]` is empty, returns general styling advice for `new_item` instead of an empty string.
 
 ### `create_fit_card`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Writes a short, post-ready caption about the thrift find and a suggested outfit.
+- **Inputs:** `outfit` (`str`), the suggestion from `suggest_outfit`; `new_item` (`dict`), one listing containing the item's details.
+- **Returns:** A two-to-four-sentence caption that mentions the item, its price, and its platform, and describes its style.
+- **When it has nothing:** If `outfit` is empty or only whitespace, returns a descriptive fallback message.
 
 ---
 
@@ -176,7 +180,7 @@ $ python -c "from tools import create_fit_card; ..."
      into results/. Paste it here and fill in the verdicts. -->
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
-|---|---|---|---|---|---|---|---|
+|-----------|--------|-------|-------|-------|-------|-------|---------|
 | 1.  |  |  |  |  |  |  |  |
 | 2.  |  |  |  |  |  |  |  |
 | 3.  |  |  |  |  |  |  |  |
