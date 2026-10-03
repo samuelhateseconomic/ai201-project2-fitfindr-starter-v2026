@@ -12,9 +12,7 @@ Build and test your three tools in `tools.py` first. Then come here.
 
     python agent.py          runs both example paths below
 """
-
 import re
-
 import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
@@ -58,6 +56,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     The query parser uses a compact regex approach: it extracts an optional size
     and a price cap, then treats the remaining words as the description.
     """
+    trace.start_trace()
     session = new_session(query, wardrobe)
 
     size_match = re.search(r"\b(?:size|sz)\s*[:=]?\s*([A-Za-z0-9/]+)", query, re.I)
@@ -85,6 +84,12 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         "size": size,
         "max_price": max_price,
     }
+    trace.step(
+        "parse_query",
+        inputs={"query": query},
+        returned=session["parsed"],
+        note="regex extraction for description, size, and max_price",
+    )
 
     iteration = 0
     while True:
@@ -96,6 +101,16 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             size=session["parsed"]["size"],
             max_price=session["parsed"]["max_price"],
         )
+        trace.step(
+            "search_listings",
+            inputs={
+                "description": session["parsed"]["description"],
+                "size": session["parsed"]["size"],
+                "max_price": session["parsed"]["max_price"],
+            },
+            returned=session["search_results"],
+            note="branch: empty list stops before outfit generation",
+        )
 
         if not session["search_results"]:
             session["error"] = (
@@ -105,13 +120,31 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             return session
 
         session["selected_item"] = session["search_results"][0]
+        trace.step(
+            "select_item",
+            inputs={"search_results": session["search_results"]},
+            returned=session["selected_item"],
+            note="first ranked result becomes selected_item",
+        )
+
         session["outfit_suggestion"] = suggest_outfit(
             session["selected_item"],
             session["wardrobe"],
         )
+        trace.step(
+            "suggest_outfit",
+            inputs={"new_item": session["selected_item"], "wardrobe": session["wardrobe"]},
+            returned=session["outfit_suggestion"],
+        )
+
         session["fit_card"] = create_fit_card(
             session["outfit_suggestion"],
             session["selected_item"],
+        )
+        trace.step(
+            "create_fit_card",
+            inputs={"outfit": session["outfit_suggestion"], "new_item": session["selected_item"]},
+            returned=session["fit_card"],
         )
         return session
 
