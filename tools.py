@@ -20,6 +20,8 @@ That last line is what your loop branches on. "Returns a list" earns nothing —
 the description has to say what is *in* the list.
 """
 
+import re
+
 import config  # noqa: F401 — you'll use this in search_listings
 from generate import generate
 from utils.data_loader import load_listings
@@ -112,8 +114,35 @@ def search_listings(
     Test it from a terminal before you move on:
         python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
     """
-    # TODO: replace this with your implementation
-    return []
+    if not description or not str(description).strip():
+        return []
+
+    target_words = _keywords(description)
+    if not target_words:
+        return []
+
+    matched = []
+    for listing in load_listings():
+        if max_price is not None and float(listing.get("price", float("inf"))) > float(max_price):
+            continue
+
+        if size and not _size_matches(size, listing.get("size", "")):
+            continue
+
+        pool = " ".join([
+            listing.get("title", ""),
+            listing.get("description", ""),
+            " ".join(listing.get("style_tags", [])),
+            " ".join(listing.get("colors", [])),
+            listing.get("category", ""),
+        ])
+        listing_words = _keywords(pool)
+        score = sum(1 for word in target_words if word in listing_words)
+        if score > 0:
+            matched.append((score, listing))
+
+    matched.sort(key=lambda pair: (-pair[0], pair[1].get("price", 0)))
+    return [listing for _, listing in matched[: config.SEARCH_RESULT_LIMIT]]
 
 
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────
@@ -146,8 +175,41 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
     Test it from a terminal before you move on:
         python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
     """
-    # TODO: replace this with your implementation
-    return ""
+    if not isinstance(new_item, dict):
+        new_item = {}
+
+    wardrobe_items = wardrobe.get("items", []) if isinstance(wardrobe, dict) else []
+
+    if not wardrobe_items:
+        item_title = new_item.get("title", "this thrifted item")
+        item_category = new_item.get("category", "")
+        item_color = ", ".join(new_item.get("colors", [])) or "neutral tones"
+        item_desc = new_item.get("description", "")
+        prompt = (
+            f"Give me 1-2 outfit ideas for this thrifted item. "
+            f"Item: {item_title}. "
+            f"Category: {item_category}. "
+            f"Colors: {item_color}. "
+            f"Description: {item_desc}. "
+            "Keep the suggestions specific and wearable, and mention the overall vibe."
+        )
+        return generate(prompt, system="You are a fashion stylist helping someone style a thrifted item.")
+
+    wardrobe_text = "\n".join(
+        f"- {item.get('name', 'Unknown')} ({item.get('category', 'item')}, colors: {', '.join(item.get('colors', [])) or 'unknown'})"
+        for item in wardrobe_items
+    )
+
+    prompt = (
+        "Suggest 1-2 outfits that pair this thrifted item with the user's existing wardrobe. "
+        f"New item: {new_item.get('title', 'Unknown item')} "
+        f"({new_item.get('category', '')}, {new_item.get('size', 'size unknown')}, "
+        f"${new_item.get('price', 'unknown')}).\n"
+        f"Description: {new_item.get('description', '')}\n"
+        f"Wardrobe:\n{wardrobe_text}\n"
+        "Keep the suggestions concrete, specific, and grounded in the pieces the user already owns."
+    )
+    return generate(prompt, system="You are a fashion stylist.")
 
 
 # ── Tool 3: create_fit_card ───────────────────────────────────────────────────
@@ -186,5 +248,23 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
     Test it from a terminal before you move on:
         python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
     """
-    # TODO: replace this with your implementation
-    return ""
+    if not isinstance(outfit, str) or not outfit.strip():
+        item_title = new_item.get("title", "This thrifted item") if isinstance(new_item, dict) else "This thrifted item"
+        return (
+            f"{item_title} feels like a standout find. "
+            "I’d wear it for a laid-back, easy look and style it with a fresh pair of basics."
+        )
+
+    item_title = new_item.get("title", "this item") if isinstance(new_item, dict) else "this item"
+    item_price = new_item.get("price", "unknown") if isinstance(new_item, dict) else "unknown"
+    item_platform = new_item.get("platform", "unknown") if isinstance(new_item, dict) else "unknown"
+
+    prompt = (
+        "Write a short caption someone would actually post about this thrift find. "
+        f"Item: {item_title}. "
+        f"Price: ${item_price}. "
+        f"Platform: {item_platform}. "
+        f"Outfit: {outfit}. "
+        "Keep it to 2-4 sentences, sound like a real person, and be specific about the vibe."
+    )
+    return generate(prompt, system="Write natural social captions about thrift finds.")
