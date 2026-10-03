@@ -39,13 +39,7 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
-     python app.py listings --full -n 6   => prints six listings with their full details.
-     python app.py fields                 => shows what information listings and wardrobe items contain
-     python app.py ask  'vintage graphic tee under $30' 
-                                          => Not work yet but expect to send that sample request to the app and prints its response in the terminal. You can replace the quoted text with your own request.
-
-
+FitFindr helps a shopper search thrift listings by description, size, and price, then choose the strongest match from the results. Once a listing is selected, the app builds outfit ideas from the user’s wardrobe and turns that into a post-ready fit card. The user can run the same flow from the terminal with `app.py` or inspect the data model with `listings` and `fields` before asking a question.
 
 ---
 
@@ -97,11 +91,9 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:** If `search_listings` returns an empty list, put a message in `session["error"]` explaining what the user could change, then stop before calling `suggest_outfit`. Otherwise, save the first (highest-ranked) result as `session["selected_item"]`, pass it and the wardrobe to `suggest_outfit`, then pass the item and outfit suggestion to `create_fit_card`.
+**Branch rule:** If `search_listings` returns an empty list, put a message in `session["error"]` explaining what the user could change, then stop before calling `suggest_outfit`. Otherwise, save the first (highest-ranked) result as `session["selected_item"]`, pass it and the wardrobe to `suggest_outfit`, then pass the item and outfit suggestion to `create_fit_card` — `agent.py::run_agent`.
 
-**Where it lives:** `agent.py::run_agent` 
-
-**How the query is parsed:** Plan to use regular expressions to extract an optional size and price limit; the remaining words become the product description.
+**How the query is parsed:** Regular expressions extract an optional size and a dollar cap; the remaining words become the product description.
 
 **What moves through the session:** Store the original `query` and `wardrobe`, then the parsed description, size, and price in `session["parsed"]`. Store search results in `session["search_results"]`. If there is a match, pass the first result through `session["selected_item"]`, `session["outfit_suggestion"]`, and finally `session["fit_card"]`. If there are no matches, store an explanation in `session["error"]` and stop before the later fields are filled.
 
@@ -151,15 +143,15 @@ $ python -c "from tools import create_fit_card; ..."
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked the AI to help me define the `search_listings` behavior and edge cases before I wrote the function, especially what happened when a query matched nothing.
+- *What came back:* It suggested the tool should return an empty list rather than `None` or an exception, and it also reminded me to handle size and price filtering before keyword scoring.
+- *What I changed:* I updated the implementation so `search_listings` returns `[]` on no matches, filters by max price and size before ranking, and keeps the loop branch safe: no model call runs when the search is empty.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked the AI to help me turn the branch logic into a concrete session-based loop, including which values should be stored and what the no-results message should say.
+- *What came back:* It proposed storing everything in `session["parsed"]`, `session["search_results"]`, and `session["selected_item"]` and said the error message should tell the user what to change instead of just saying "No results."
+- *What I changed:* I changed `run_agent` so it parses the query, writes the values into the session, stops early on the empty-search branch, and returns a message like "No listings matched that request. Try a broader description, a different size, or a higher budget." This made the state visible and testable.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
