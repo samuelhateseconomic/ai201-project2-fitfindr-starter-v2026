@@ -58,7 +58,7 @@ FitFindr helps a shopper search thrift listings by description, size, and price,
 ### `search_listings`
 
 - **What it does:** This tool is intended to find listings related to a product description. It filters out listings that do not match the requested size or exceed the price limit, then ranks the remaining listings by keyword overlap with the description.
-- **Inputs:** It takes a `description` (string) and `size` (string) and `maximum price` (float).
+- **Inputs:** It takes a `description` (string), and optionally a `size` (string) and `max_price` (float, in dollars).
 - **Returns:** A list of matching listing dictionaries, ranked by keyword overlap and limited to the configured result limit. Each dictionary contains listing details such as its title, description, size, price, colors, and platform.
 - **When it has nothing:** Returns an empty list (`[]`) if nothing matches.
 

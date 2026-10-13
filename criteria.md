@@ -25,7 +25,6 @@ An impossible query stops before the second tool in 5 of 5 tries because the emp
 The selected item remains consistent through the loop: in 5 of 5 tries and match for all three tools.
 
 
-
 **Why this target:**
 Because state is not the model output itself. It is the saved values in the session between tool calls. In other words, the tool is working only if the session keeps the right data from one step to the next.
 
@@ -45,7 +44,6 @@ The model is allowed to vary, but the card still has to be usable as a post capt
 ## 5. Empty wardrobe path
 
 With an empty wardrobe, suggest_outfit returns a non-empty styling suggestion in 5 of 5 tries.
-
 
 
 **Why this target:**

@@ -15,8 +15,9 @@ Build and test your three tools in `tools.py` first. Then come here.
 import re
 import config
 import trace
-from tools import search_listings, suggest_outfit, create_fit_card
+from tools import suggest_outfit, create_fit_card
 from generate import ModelUnavailable
+from mcp_client import call_tool
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -96,13 +97,16 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         iteration += 1
         trace.check_iterations(iteration)
 
-        session["search_results"] = search_listings(
-            description=session["parsed"]["description"],
-            size=session["parsed"]["size"],
-            max_price=session["parsed"]["max_price"],
+        session["search_results"] = call_tool(
+            "search_listings",
+            {
+                "description": session["parsed"]["description"],
+                "size": session["parsed"]["size"],
+                "max_price": session["parsed"]["max_price"],
+            },
         )
         trace.step(
-            "search_listings",
+            "search_listings (via MCP)",
             inputs={
                 "description": session["parsed"]["description"],
                 "size": session["parsed"]["size"],
