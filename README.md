@@ -167,14 +167,14 @@ output is in [results/run_2026-10-13_1606_before.md](results/run_2026-10-13_1606
 | 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 | 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 | 3. The selected item remains consistent through the loop | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
-| 4. Fit card is 2–4 sentences and mentions price and platform | 5 of 5 | PASS | PASS | PASS | FAIL | FAIL | MISSED (3/5) |
+| 4. Fit card is 2–4 sentences and mentions price and platform | 5 of 5 | PASS | PASS | PASS | PASS | FAIL | MISSED (4/5) |
 | 5. Empty wardrobe produces a non-empty suggestion | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
 The run report records a selected item on every matching try. In
 `agent.py::run_agent`, that same `session["selected_item"]` is passed to both
-`suggest_outfit` and `create_fit_card`. Fit-card tries 4 and 5 omitted the
-platform, so criterion 4 missed its target despite all five cards mentioning
-the $18 price and meeting the sentence-count requirement.
+`suggest_outfit` and `create_fit_card`. Fit-card try 5 omitted the platform,
+so criterion 4 missed its target despite all five cards mentioning the $18
+price and meeting the sentence-count requirement. Try 4 did mention Depop.
 
 **Real output — Criterion 1, Try 1** (`run_eval.py::run_once` calling
 `agent.py::run_agent`):
@@ -220,7 +220,7 @@ tools; the recorded selected item was the same on all five tries.
 Okay but this butterfly tee is literally straight out of a 2000s music video 🦋✨ Only $18 on my Depop so grab it before I change my mind and keep it for myself. Pair it with baggy low-rise denim or khaki cargos and combat boots for the ultimate pop-star-off-duty vibe.
 ```
 
-Try 4’s card omitted the platform:
+Try 5’s card omitted the platform:
 
 ```
 Found the ultimate 2000s butterfly baby tee for just $18 and I’m never taking it off. Gives major model-off-duty energy when paired with baggy low-rise denim, but it's just as cute dressed down with khaki trousers. Grab it before I change my mind and keep it for myself! 🦋✨
@@ -299,19 +299,30 @@ Agent message: “Model unavailable: The model rejected your API key. Check GEMI
 
 **Which failure it was meant to fix:** A model outage or rejected key previously aborted the agent before it could return a session or trace the failed tool result. The empty-search check still stops before model calls, and all search results now arrive through the MCP boundary.
 
-**Evaluation result:** The five-try run above confirms criteria 1, 2, 3, and 5
-met their targets. Criterion 4 missed: two generated fit cards did not name
-the listing platform.
+## Verdicts and Diagnosis
+
+Criteria 1, 2, 3, and 5 **MET** their targets (5/5 each; criterion 1 required
+4/5). Criterion 4 **MISSED** its 5/5 target with 4/5 passes.
+
+The miss occurred at the `create_fit_card` step: on try 5, the generated
+caption mentioned the $18 price and styling but did not name Depop, the
+platform in the selected listing. `tools.py::create_fit_card` includes the
+platform in the model prompt, but relies on generated prose to repeat it; the
+model treated that detail as optional. This is a model-output reliability
+problem in that one tool, not a search, branch, or session-state failure. The
+other four cards named Depop, including try 4 (“only $18 on my Depop”).
+The criterion is measurable and tests the intended contract, so it remains
+unchanged; the missed try is not a reason to lower the target.
 
 ---
 
 ## What's Still Broken
 
-Criterion 4 remains unmet: in two of five uncached runs, `create_fit_card`
-omitted the listing platform. The other four criteria met their stated
-five-try targets in this run. The MCP server is registered and the agent's
-search uses it; the remaining improvement is to make fit-card captions
-reliably mention the platform without weakening the criterion.
+Criterion 4 remains unmet: in one of five uncached runs, `create_fit_card`
+omitted the listing platform. The other four criteria met their stated targets
+in this run. The MCP server is registered and the agent's search uses it; the
+remaining improvement is to make fit-card captions reliably mention the
+platform without weakening the criterion.
 
 ---
 
