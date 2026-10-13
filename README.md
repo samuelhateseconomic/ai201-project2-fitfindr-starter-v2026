@@ -157,44 +157,85 @@ $ python -c "from tools import create_fit_card; ..."
 
 ## Run Log — Before
 
+Command: `python run_eval.py --label before`
+Produced by `run_eval.py::main` / `run_eval.py::run_once`, which call
+`agent.py::run_agent`; five tries per scenario, cache off. The full captured
+output is in [results/run_2026-10-13_1606_before.md](results/run_2026-10-13_1606_before.md).
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
-|-----------|--------|-------|-------|-------|-------|-------|---------|
-| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET |
-| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET |
-| 3. Something about state | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET |
-| 4. Something about the fit card | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET |
-| 5. Empty wardrobe path | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET |
+|---|---|---|---|---|---|---|---|
+| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. The selected item remains consistent through the loop | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card is 2–4 sentences and mentions price and platform | 5 of 5 | PASS | PASS | PASS | FAIL | FAIL | MISSED (3/5) |
+| 5. Empty wardrobe produces a non-empty suggestion | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+The run report records a selected item on every matching try. In
+`agent.py::run_agent`, that same `session["selected_item"]` is passed to both
+`suggest_outfit` and `create_fit_card`. Fit-card tries 4 and 5 omitted the
+platform, so criterion 4 missed its target despite all five cards mentioning
+the $18 price and meeting the sentence-count requirement.
+
+**Real output — Criterion 1, Try 1** (`run_eval.py::run_once` calling
+`agent.py::run_agent`):
 
 ```
-=== HAPPY ===
-error= None
-selected= Y2K Baby Tee — Butterfly Print
-fit_card= Found the holy grail of Y2K baby tees for only $18 🦋 Obsessed with the butterfly print and how cropped it is. Literally going to wear this with baggy low-rise jeans and chunky sneakers on heavy rotation.
-=== EMPTY ===
-error= No listings matched that request. Try a broader description, a different size, or a higher budget.
-selected= None
-fit_card= None
+- stopped early: no
+- selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+- search_results: 10
+Fit card:
+Okay but this butterfly tee is literally straight out of a 2000s music video 🦋✨ Only $18 on my Depop so grab it before I change my mind and keep it for myself. Pair it with baggy low-rise denim or khaki cargos and combat boots for the ultimate pop-star-off-duty vibe.
 ```
 
----
+**Real output — Criterion 2, Try 1** (`agent.py::run_agent` trace and session):
 
-## Verdicts and Diagnoses
+```
+[2] search_listings (via MCP)
+      out: [] (empty)
+      →    branch: empty list stops; otherwise continue with the first result
+- stopped early: yes — No listings matched that request. Try a broader description, a different size, or a higher budget.
+- selected_item: (none)
+- search_results: 0
+```
 
-| # | Criterion | Target | Verdict | How I decided |
-|---|---|---|---|---|
-| 1 | A matching query completes all three tools | 4 of 5 | MET | The happy-path run completed search, outfit generation, and the fit card, and the result was consistent across repeated checks. |
-| 2 | An impossible query stops before the second tool | 5 of 5 | MET | The empty-search run returned an explanatory error and left `fit_card` as `None`, which matches the required branch behavior. |
-| 3 | Something about state | 5 of 5 | MET | The selected item stayed in `session["selected_item"]` and was the same item passed into `suggest_outfit` and `create_fit_card`. |
-| 4 | Something about the fit card | 5 of 5 | MET | The fit card was a real social caption, mentioned the item price, and stayed in the 2–4 sentence range. |
-| 5 | Empty wardrobe path | 5 of 5 | MET | The empty-wardrobe run returned non-empty styling advice instead of crashing or returning an empty string. |
+**Real output — Criterion 3, Try 1** (`agent.py::run_agent` session and tool trace):
 
-**Diagnoses**
+```
+- selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+[3] select_item
+      out: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+[4] suggest_outfit
+      in:  dict with keys: new_item, wardrobe
+[5] create_fit_card
+      in:  dict with keys: outfit, new_item
+```
 
-All five criteria met their targets in the current run. The branch logic and the session state were the main sources of risk, and both were validated: the empty-search branch stopped early, while the happy path advanced through all three tools with the same selected item kept in session.
+The implementation passes `session["selected_item"]` as `new_item` to both
+tools; the recorded selected item was the same on all five tries.
+
+**Real output — Criterion 4, Try 1** (`tools.py::create_fit_card` via
+`agent.py::run_agent`):
+
+```
+Okay but this butterfly tee is literally straight out of a 2000s music video 🦋✨ Only $18 on my Depop so grab it before I change my mind and keep it for myself. Pair it with baggy low-rise denim or khaki cargos and combat boots for the ultimate pop-star-off-duty vibe.
+```
+
+Try 4’s card omitted the platform:
+
+```
+Found the ultimate 2000s butterfly baby tee for just $18 and I’m never taking it off. Gives major model-off-duty energy when paired with baggy low-rise denim, but it's just as cute dressed down with khaki trousers. Grab it before I change my mind and keep it for myself! 🦋✨
+```
+
+**Real output — Criterion 5, Try 1** (`tools.py::suggest_outfit` via
+`agent.py::run_agent`, empty wardrobe):
+
+```
+Oh, what a find! A butterfly print baby tee is the ultimate Y2K holy grail. Since it’s cropped and fitted (and runs a bit small), the key is balancing the proportions while leaning fully into that nostalgic, effortless 2000s energy.
+
+Here are two specific, highly wearable ways to style your new favorite top:
+```
+
+The report contains the complete suggestion and all five tries for each criterion.
 
 ---
 
@@ -258,48 +299,19 @@ Agent message: “Model unavailable: The model rejected your API key. Check GEMI
 
 **Which failure it was meant to fix:** A model outage or rejected key previously aborted the agent before it could return a session or trace the failed tool result. The empty-search check still stops before model calls, and all search results now arrive through the MCP boundary.
 
-### Run Log — After
-
-| Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
-|---|---|---|---|---|---|---|---|
-| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET |
-| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET |
-| 3. Something about state | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET |
-| 4. Something about the fit card | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET |
-| 5. Empty wardrobe path | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET |
-
-**Did it help, and how do I know:** It helped because the happy path completes correctly and the empty-search path exits before the second tool. The real output below shows the selected item staying in the session and the no-results error stopping the flow before `fit_card` is set.
-
-``` 
-=== HAPPY ===
-error= None
-selected= Y2K Baby Tee — Butterfly Print
-fit_card= Found the holy grail of Y2K baby tees for only $18 🦋 Obsessed with the butterfly print and how cropped it is. Literally going to wear this with baggy low-rise jeans and chunky sneakers on heavy rotation.
-=== EMPTY ===
-error= No listings matched that request. Try a broader description, a different size, or a higher budget.
-selected= None
-fit_card= None
-``` 
-
-
+**Evaluation result:** The five-try run above confirms criteria 1, 2, 3, and 5
+met their targets. Criterion 4 missed: two generated fit cards did not name
+the listing platform.
 
 ---
 
 ## What's Still Broken
 
-The main issue still in the repo is not the search/suggest/fit-card loop itself. The loop is working in-process and the branch logic is validated. The remaining open problem is the MCP milestone: the project still has not exposed `search_listings` through the MCP server.
-
-This shows up directly in [mcp_server.py](mcp_server.py). The file still contains the placeholder block with the comment `TODO — register one tool.` and the actual `@mcp.tool()` registration is commented out. That means the project can run with direct Python calls, but it is not yet speaking the external MCP contract that the assignment asks for.
-
-So the honest status is:
-
-- Local agent loop: working
-- Empty-search branch: working
-- Session state tracking: working
-- Fit card generation: working
-- MCP server registration: not finished yet
-
-The next fix would be to uncomment and register the `search_listings` tool with a clear description and typed inputs, then swap the direct call in [agent.py](agent.py) to the MCP client call path. In other words, the code is functionally solid, but the protocol integration is still the unfinished piece.
+Criterion 4 remains unmet: in two of five uncached runs, `create_fit_card`
+omitted the listing platform. The other four criteria met their stated
+five-try targets in this run. The MCP server is registered and the agent's
+search uses it; the remaining improvement is to make fit-card captions
+reliably mention the platform without weakening the criterion.
 
 ---
 
