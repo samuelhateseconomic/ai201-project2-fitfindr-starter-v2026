@@ -261,6 +261,8 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
 
     prompt = (
         "Write a short caption someone would actually post about this thrift find. "
+        "The caption must explicitly name the item's platform exactly as provided; "
+        "do not omit it or substitute a generic phrase. "
         f"Item: {item_title}. "
         f"Price: ${item_price}. "
         f"Platform: {item_platform}. "

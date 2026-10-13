@@ -239,6 +239,58 @@ The report contains the complete suggestion and all five tries for each criterio
 
 ---
 
+## Run Log — After
+
+**One change:** in `tools.py::create_fit_card`, I made the prompt explicitly
+require the caption to name the listing platform exactly as provided and forbid
+omitting or replacing it with a generic phrase. No other behavior or prompt was
+changed.
+
+Command: `python run_eval.py --label after`
+Produced by `run_eval.py::main` / `run_eval.py::run_once`, calling
+`agent.py::run_agent`; five tries per scenario, cache off. Full captured
+output is in [results/run_2026-10-13_1618_after.md](results/run_2026-10-13_1618_after.md).
+
+| Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
+|---|---|---|---|---|---|---|---|
+| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. The selected item remains consistent through the loop | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card is 2–4 sentences and mentions price and platform | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Empty wardrobe produces a non-empty suggestion | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+
+**Real post-change outputs** (`run_eval.py::run_once` calling
+`agent.py::run_agent`):
+
+- Criterion 1, Try 1: selected “Y2K Baby Tee — Butterfly Print” ($18.0,
+  depop); search, outfit suggestion, and fit card all completed.
+- Criterion 2, Try 1: `stopped early: yes — No listings matched that request.
+  Try a broader description, a different size, or a higher budget.`
+- Criterion 3, Try 1: selected “Y2K Baby Tee — Butterfly Print” ($18.0,
+  depop); `agent.py::run_agent` passed `session["selected_item"]` to both
+  `suggest_outfit` and `create_fit_card`.
+- Criterion 4, all five actual fit cards from `tools.py::create_fit_card`:
+
+```
+1. Scored this absolute dream Y2K Baby Tee — Butterfly Print on depop for $18. It’s giving major 2000s model-off-duty, especially when paired with baggy dark wash denim and chunky sneakers. Such a nostalgic little find!
+2. Still not over this Y2K Butterfly Baby Tee I manifested on depop for just $18. It's giving total early 2000s pop star off-duty, whether I style it with baggy dark wash denim or edgy combat boots. Such a good little score!
+3. Manifesting warm weather just so I can wear this Y2K Butterfly Baby Tee on repeat. Found it on depop for $18 and honestly, the nostalgic print is giving all the effortless 2000s vibes I've been looking for. Can't wait to style this with baggy denim or wide-leg trousers for the ultimate off-duty look!
+4. Found the ultimate Y2K Baby Tee — Butterfly Print on depop for just $18! I’m totally obsessed with how fitted it is and already styling it with baggy jeans and my black zip-up for that ultimate early 2000s streetwear vibe. Thrift gods seriously delivered with this one. ✨🦋
+5. Found the ultimate Y2K butterfly baby tee scrolling on depop for just $18, and I am obsessed. The fit is so flattering and it instantly gives off that effortless early-2000s model-off-duty vibe. Can't wait to style this with some baggy denim!
+```
+
+- Criterion 5, Try 1: `tools.py::suggest_outfit` returned a non-empty
+  two-outfit styling suggestion for the selected tee with an empty wardrobe;
+  the complete suggestion is in the linked after-run report.
+
+**Did it help?** Yes, for this measured run. Criterion 4 improved from 4/5
+before to 5/5 after, meeting its target. The other four criteria remained at
+5/5. This is evidence from five uncached fit-card tries, not a guarantee for
+future model outputs; the prompt still depends on the model following its
+instructions.
+
+---
+
 ## Loop Trace
 
 **Happy path**
@@ -299,7 +351,7 @@ Agent message: “Model unavailable: The model rejected your API key. Check GEMI
 
 **Which failure it was meant to fix:** A model outage or rejected key previously aborted the agent before it could return a session or trace the failed tool result. The empty-search check still stops before model calls, and all search results now arrive through the MCP boundary.
 
-## Verdicts and Diagnosis
+## Before-run Verdicts and Diagnosis
 
 Criteria 1, 2, 3, and 5 **MET** their targets (5/5 each; criterion 1 required
 4/5). Criterion 4 **MISSED** its 5/5 target with 4/5 passes.
@@ -318,11 +370,11 @@ unchanged; the missed try is not a reason to lower the target.
 
 ## What's Still Broken
 
-Criterion 4 remains unmet: in one of five uncached runs, `create_fit_card`
-omitted the listing platform. The other four criteria met their stated targets
-in this run. The MCP server is registered and the agent's search uses it; the
-remaining improvement is to make fit-card captions reliably mention the
-platform without weakening the criterion.
+The before run missed criterion 4, but after the prompt change it passed all
+five uncached tries. No criterion missed its target in the after run. The
+model can still vary on future inputs, so the fit-card requirement should
+continue to be checked in later evaluations. The MCP server is registered and
+the agent's search uses it.
 
 ---
 
