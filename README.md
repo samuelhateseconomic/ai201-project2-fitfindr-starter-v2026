@@ -134,7 +134,7 @@ $ python -c "from tools import create_fit_card; ..."
 
 ## How I Used AI
 
-<!-- Two specific moments. What you asked, what came back, what you changed.
+<!-- Specific moments. What you asked, what came back, what you changed.
 
      "I used Claude to help me code" is not enough.
 
@@ -152,6 +152,19 @@ $ python -c "from tools import create_fit_card; ..."
 - *What I asked for:* I asked the AI to help me turn the branch logic into a concrete session-based loop, including which values should be stored and what the no-results message should say.
 - *What came back:* It proposed storing everything in `session["parsed"]`, `session["search_results"]`, and `session["selected_item"]` and said the error message should tell the user what to change instead of just saying "No results."
 - *What I changed:* I changed `run_agent` so it parses the query, writes the values into the session, stops early on the empty-search branch, and returns a message like "No listings matched that request. Try a broader description, a different size, or a higher budget." This made the state visible and testable.
+
+**Moment 3 — diagnosing and improving fit-card reliability**
+
+- *What I asked for:* I used AI to compare the five uncached before-run cards
+  with criterion 4 and identify why a try failed.
+- *What came back:* The failure was at `tools.py::create_fit_card`: its prompt
+  provided the platform but did not make including it an explicit,
+  non-optional requirement. Four cards named Depop; one did not.
+- *What I changed:* I made one prompt-only change requiring the exact platform
+  name and forbidding omission or substitution with generic wording. I then
+  ran the same five scenarios five times with caching disabled. Criterion 4
+  improved from 4/5 to 5/5, while the other criteria stayed at 5/5. This is a
+  measured result from this run, not a guarantee about future generations.
 
 ---
 
@@ -351,6 +364,12 @@ Agent message: “Model unavailable: The model rejected your API key. Check GEMI
 
 **Which failure it was meant to fix:** A model outage or rejected key previously aborted the agent before it could return a session or trace the failed tool result. The empty-search check still stops before model calls, and all search results now arrive through the MCP boundary.
 
+**MCP move:** `agent.py::run_agent` now calls `search_listings` through
+`mcp_client.call_tool` instead of calling the Python function directly. The
+search still returns the same list of listing dictionaries, and the five-try
+evaluation showed no change to the loop's downstream behavior; the trace
+identifies the search as “via MCP.”
+
 ## Before-run Verdicts and Diagnosis
 
 Criteria 1, 2, 3, and 5 **MET** their targets (5/5 each; criterion 1 required
@@ -370,11 +389,13 @@ unchanged; the missed try is not a reason to lower the target.
 
 ## What's Still Broken
 
-The before run missed criterion 4, but after the prompt change it passed all
-five uncached tries. No criterion missed its target in the after run. The
-model can still vary on future inputs, so the fit-card requirement should
-continue to be checked in later evaluations. The MCP server is registered and
-the agent's search uses it.
+No criterion missed its target in the after run: each passed 5/5 (criterion 1
+required 4/5). The before-run platform omission is fixed for this measured
+sample, but future model responses could still omit required details because
+the tool relies on prompt compliance. I would next add a small output check
+and a deterministic repair/fallback if platform or price is missing. I stopped
+after the prompt-only change so this before/after evaluation measured one
+improvement at a time; I have not tested that additional change yet.
 
 ---
 
