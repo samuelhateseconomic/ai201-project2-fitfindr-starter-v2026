@@ -113,7 +113,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
                 "max_price": session["parsed"]["max_price"],
             },
             returned=session["search_results"],
-            note="branch: empty list stops before outfit generation",
+            note="branch: empty list stops; otherwise continue with the first result",
         )
 
         if not session["search_results"]:
@@ -131,20 +131,38 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             note="first ranked result becomes selected_item",
         )
 
-        session["outfit_suggestion"] = suggest_outfit(
-            session["selected_item"],
-            session["wardrobe"],
-        )
+        try:
+            session["outfit_suggestion"] = suggest_outfit(
+                session["selected_item"],
+                session["wardrobe"],
+            )
+        except ModelUnavailable as exc:
+            session["error"] = f"Model unavailable: {exc}"
+            trace.step(
+                "suggest_outfit",
+                inputs={"new_item": session["selected_item"], "wardrobe": session["wardrobe"]},
+                returned=session["error"],
+            )
+            return session
         trace.step(
             "suggest_outfit",
             inputs={"new_item": session["selected_item"], "wardrobe": session["wardrobe"]},
             returned=session["outfit_suggestion"],
         )
 
-        session["fit_card"] = create_fit_card(
-            session["outfit_suggestion"],
-            session["selected_item"],
-        )
+        try:
+            session["fit_card"] = create_fit_card(
+                session["outfit_suggestion"],
+                session["selected_item"],
+            )
+        except ModelUnavailable as exc:
+            session["error"] = f"Model unavailable: {exc}"
+            trace.step(
+                "create_fit_card",
+                inputs={"outfit": session["outfit_suggestion"], "new_item": session["selected_item"]},
+                returned=session["error"],
+            )
+            return session
         trace.step(
             "create_fit_card",
             inputs={"outfit": session["outfit_suggestion"], "new_item": session["selected_item"]},

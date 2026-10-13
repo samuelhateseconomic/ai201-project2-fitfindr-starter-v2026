@@ -91,7 +91,7 @@ FitFindr helps a shopper search thrift listings by description, size, and price,
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:** If `search_listings` returns an empty list, put a message in `session["error"]` explaining what the user could change, then stop before calling `suggest_outfit`. Otherwise, save the first (highest-ranked) result as `session["selected_item"]`, pass it and the wardrobe to `suggest_outfit`, then pass the item and outfit suggestion to `create_fit_card` — `agent.py::run_agent`.
+**Branch rule:** If the MCP `search_listings` call returns an empty list, put a message in `session["error"]` explaining what the user could change, then stop before calling `suggest_outfit`. Otherwise, save the first (highest-ranked) result as `session["selected_item"]`, pass it and the wardrobe to `suggest_outfit`, then pass the item and outfit suggestion to `create_fit_card`. If either model-backed tool raises `ModelUnavailable`, save its actionable message in `session["error"]`, trace the failed tool result, and stop — `agent.py::run_agent`.
 
 **How the query is parsed:** Regular expressions extract an optional size and a dollar cap; the remaining words become the product description.
 
@@ -202,44 +202,61 @@ All five criteria met their targets in the current run. The branch logic and the
 
 **Happy path**
 
+Command: `python app.py ask 'vintage graphic tee under $30' --trace`
+
 ```
 [1] parse_query
-      in:  {'query': "looking for a vintage graphic tee under $30"}
-      out: {'description': 'vintage graphic tee', 'size': None, 'max_price': 30.0}
-[2] search_listings
-      in:  {'description': 'vintage graphic tee', 'size': None, 'max_price': 30.0}
-      out: 6 items: Y2K Baby Tee — Butterfly Print, Vintage Band Tee — Faded Grey, Graphic Tee — 2003 Tour Bootleg Style, Mesh Long-Sleeve Top — Black, Vintage Graphic Hoodie — Faded Black, …
+      in:  dict with keys: query
+      out: dict with keys: description, size, max_price
+      →    regex extraction for description, size, and max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Vintage Band Tee — Faded Grey, Graphic Tee — 2003 Tour Bootleg Style … +7 more
+      →    branch: empty list stops; otherwise continue with the first result
 [3] select_item
-      in:  {'search_results': 6 items: Y2K Baby Tee — Butterfly Print, Vintage Band Tee — Faded Grey, Graphic Tee — 2003 Tour Bootleg Style, Mesh Long-Sleeve Top — Black, Vintage Graphic Hoodie — Faded Black, …}
+      in:  dict with keys: search_results
       out: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      →    first ranked result becomes selected_item
 [4] suggest_outfit
-      in:  {'new_item': Y2K Baby Tee — Butterfly Print ($18.0, depop), 'wardrobe': {'items': ...}}
-      out: Here are two concrete outfit suggestions that balance the Y2K aesthetic of your new baby tee with pieces already in your wardrobe...
+      in:  dict with keys: new_item, wardrobe
+      out: Here are two concrete outfit suggestions that balance the Y2K aesthetic of your new baby tee with pieces alrea…
 [5] create_fit_card
-      in:  {'outfit': 'Here are two concrete outfit suggestions...', 'new_item': Y2K Baby Tee — Butterfly Print ($18.0, depop)}
-      out: Found the holy grail of Y2K baby tees for only $18 🦋 Obsessed with the butterfly print and how cropped it is...
+      in:  dict with keys: outfit, new_item
+      out: Found the holy grail of Y2K baby tees for only $18 🦋 Obsessed with the butterfly print and how cropped it is. …
 ```
 
-**Empty search**
+## Failure Checks
+
+**Empty search** — `python app.py ask 'designer ballgown size XXS under $5' --trace`
 
 ```
 [1] parse_query
-      in:  {'query': 'designer ballgown size XXS under $5'}
-      out: {'description': 'designer ballgown under 5', 'size': 'XXS', 'max_price': 5.0}
-[2] search_listings
-      in:  {'description': 'designer ballgown under 5', 'size': 'XXS', 'max_price': 5.0}
+      in:  dict with keys: query
+      out: dict with keys: description, size, max_price
+      →    regex extraction for description, size, and max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
       out: [] (empty)
+      →    branch: empty list stops; otherwise continue with the first result
 ```
 
-**On the MCP move:** No MCP rewrite was needed for this milestone. The branch logic was fixed in-process in `agent.py::run_agent`, and the loop correctly stopped before the model call on the empty-search path.
+Agent message: “No listings matched that request. Try a broader description, a different size, or a higher budget.”
+
+**Empty wardrobe** — `python app.py ask 'vintage graphic tee under $30' --empty-wardrobe --trace`
+
+Agent message: “Ooh, a butterfly print baby tee is the ultimate Y2K grail find! Since it runs small and is cropped, we want to lean into that quintessential early 2000s silhouette while keeping it wearable for today. Here are two distinct outfit ideas for your thrifted tee:” It then gave two specific outfits and a fit card; the suggestion was non-empty and the run did not crash.
+
+**Model unavailable** — tested with caching disabled and a temporary invalid `GEMINI_API_KEY` process variable using the uncached query `vintage band tee under $27`; `.env` was not changed.
+
+Agent message: “Model unavailable: The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.”
 
 ---
 
 ## The Improvement
 
-**What I changed:** I wired the agent loop in `agent.py::run_agent` to parse the query, write the parsed values into the session, call `search_listings`, and stop early on the empty-search branch instead of continuing into `suggest_outfit`.
+**What I changed:** I routed the search through `mcp_client.call_tool` and added `ModelUnavailable` handlers around both model-backed tools. Failed model calls now put an actionable message in `session["error"]`, record the failed tool in the trace, and return the session instead of bubbling an exception out of the agent.
 
-**Which failure it was meant to fix:** The only real failure mode here was a missing branch: the loop was not checking `session["search_results"]` before advancing to the model, and it was not storing the selected item in a visible session state.
+**Which failure it was meant to fix:** A model outage or rejected key previously aborted the agent before it could return a session or trace the failed tool result. The empty-search check still stops before model calls, and all search results now arrive through the MCP boundary.
 
 ### Run Log — After
 
